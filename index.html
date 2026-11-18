@@ -78,6 +78,8 @@ window.addEventListener('error', function(e){
   nav{display:flex;gap:3px;padding:5px;background:linear-gradient(#ffffff,#d6eaff);border-top:4px solid #2f7de1}
   nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:11px;border:0;border-radius:12px;box-shadow:none;background:transparent;color:#6a78a8;text-shadow:none;padding:5px 0 4px}
   nav button:active{transform:none}
+  nav button{position:relative}
+  nav button.dot::after{content:"";position:absolute;top:3px;right:22%;width:11px;height:11px;border-radius:50%;background:#ff3b30;border:2px solid #fff}
   nav button.on{background:linear-gradient(#ffe97a,#ffa91f);color:#6a3a00;box-shadow:inset 0 2px 0 #fff,0 3px 0 #b86400}
   nav button:disabled{background:transparent;opacity:.5;box-shadow:none}
   #modal{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(15,40,100,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
@@ -149,7 +151,7 @@ window.addEventListener('error', function(e){
     <div id="bootHero"></div>
     <div id="bootBar"><i></i></div>
     <div id="bootMsg">Loading…</div>
-    <div id="bootCopy">© BAEBAE Studio · v1118b</div>
+    <div id="bootCopy">© BAEBAE Studio · v1118c</div>
   </div>
   <div id="bootStudio">
     <div class="mark"><img id="studioLogo" src="assets/brand/studio_logo.png" alt="" style="max-width:56vw;max-height:30vh;display:none" onload="this.style.display='block';document.getElementById('studioMark').style.display='none'" onerror="this.remove()">
@@ -1034,7 +1036,23 @@ function dungeon(k){
 }
 function adDungeon(){ showAd('dungeon', () => DG.forEach(([k]) => S.dgKeys[k]++)); }
 // 날짜가 바뀌면 탑 입장권과 던전 열쇠를 채운다
+// 출석 보상: 하루 한 번, 7일 주기 (7일째는 큰 보상)
+const ATT = [30, 30, 50, 50, 80, 80, 200];
+function attend(){
+  if (S.attDay === today() || !S.tutDone || $('modal').style.display === 'flex' || mode === 'match') return;
+  const n = (S.attN || 0) % 7, g = ATT[n];
+  S.attDay = today(); S.attN = n + 1; S.gem += g; save(); hud();
+  modal(`<h2>${ic('calendar', 24)} 출석 ${n + 1}일째!</h2>
+    <p style="text-align:center">오늘의 출석 보상 <b>보석 ${g}개</b>를 받았어요.</p>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:8px 0">${ATT.map((v, i) => `<div style="text-align:center;padding:5px 0;border-radius:8px;font:800 11px sans-serif;background:${i < n + 1 ? '#ffe97a' : '#e6eefb'};color:#4a3a00">${i + 1}일<br>${v}${i <= n ? '<br>✔' : ''}</div>`).join('')}</div>
+    <p class="muted" style="text-align:center">매일 접속하면 7일째에 큰 보상!</p>`, [{label: '받았어요'}]);
+}
+function dots(){
+  const claim = MISSIONS.some(m => S.ms[m.id] >= msTarget(m));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('dot', b.dataset.tab === 'match' && claim));
+}
 function daily(){
+  try { attend(); dots(); } catch (e) {}
   if (S.ticketDay === today()) return;
   S.ticketDay = today(); S.tickets = Math.max(S.tickets, 3);
   DG.forEach(([k]) => S.dgKeys[k] = Math.max(S.dgKeys[k], DG_KEYS));
@@ -1297,7 +1315,7 @@ function drawBoards(now){
   }
 }
 function renderPanel(){
-  document.querySelectorAll('nav button').forEach(b => { b.classList.toggle('on', b.dataset.tab === tab); b.disabled = mode === 'match'; if (!b.dataset.ko) b.dataset.ko = b.textContent; b.innerHTML = ic(NAV_IC[b.dataset.tab], 26) + '<span>' + t(b.dataset.ko) + '</span>'; });
+  document.querySelectorAll('nav button').forEach(b => { b.classList.toggle('on', b.dataset.tab === tab); b.disabled = mode === 'match'; if (!b.dataset.ko) b.dataset.ko = b.textContent; b.innerHTML = ic(NAV_IC[b.dataset.tab], 26) + '<span>' + t(b.dataset.ko) + '</span>'; }); try { dots(); } catch (e) {}
   const p = $('panel');
   if (!S.started) { p.innerHTML = ''; return; }
   if (mode === 'match') {
@@ -1487,13 +1505,28 @@ function clubConfirm(){
   if (clubDone) clubDone();
 }
 
+// 처음 한 번만 보여 주는 쉬운 안내 (4장)
+const TUT = [
+  ['🏐 이 게임은 이렇게 해요', '선수들이 <b>알아서 연습</b>하고 경기해요.<br>가만히 둬도 <b>코인</b>이 쌓이니까, 편하게 지켜보면 돼요.'],
+  ['💪 코인으로 선수를 키워요', '아래 <b>리그</b> 탭에서 코인으로 선수 능력을 올려요.<br>선수가 강해지면 코인도 더 빨리 쌓여요.'],
+  ['🎁 새 선수는 보상·상점에서', '<b>보상</b> 탭에서 새 선수를 뽑고, <b>상점</b>에서 장비를 사요.<br>희귀한 선수일수록 능력이 높아요.'],
+  ['🏆 목표는 우승!', '경기에서 이기면 리그가 올라가요.<br>자, 이제 구단주님의 구단을 키워 보세요!']
+];
+function tutorial(i){
+  if (S.tutDone) return;
+  if (i >= TUT.length) { S.tutDone = true; save(); return; }
+  const s = TUT[i];
+  modal(`<h2>${s[0]}</h2><p style="text-align:center;line-height:1.7">${s[1]}</p><div class="muted" style="text-align:center">${i + 1} / ${TUT.length}</div>`,
+    [{label: i < TUT.length - 1 ? '다음' : '시작하기', fn: () => tutorial(i + 1)}]);
+}
+
 // 긴급 드래프트: 포지션 6자리를 한 명씩 지명. 1순위 지명권(레어)은 한 번만 쓸 수 있다.
 function draftRound(i, topUsed){ try { draftRound2(i, topUsed); } catch (e) { showErr('드래프트 오류: ' + e.message + ' @' + (e.stack || '').split('\n')[0]); } }
 function draftRound2(i, topUsed){
   if (i >= SLOTS.length) {
     S.started = true; if (!S.trainee) S.trainee = lineup()[0].id;
     lg = {my:0, op:0, perf:0};
-    save(); closeModal(); hud(); renderPanel(); scoreboard(); return;
+    save(); closeModal(); hud(); renderPanel(); scoreboard(); try { tutorial(0); } catch (e) { showErr('안내 오류: ' + e.message); } return;
   }
   paused = true;
   // 후보는 B등급 3명 + A등급 1명을 무작위로 뽑아 보여 준다
