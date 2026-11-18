@@ -151,7 +151,7 @@ window.addEventListener('error', function(e){
     <div id="bootHero"></div>
     <div id="bootBar"><i></i></div>
     <div id="bootMsg">Loading…</div>
-    <div id="bootCopy">© BAEBAE Studio · v1118c</div>
+    <div id="bootCopy">© BAEBAE Studio · v1118d</div>
   </div>
   <div id="bootStudio">
     <div class="mark"><img id="studioLogo" src="assets/brand/studio_logo.png" alt="" style="max-width:56vw;max-height:30vh;display:none" onload="this.style.display='block';document.getElementById('studioMark').style.display='none'" onerror="this.remove()">
@@ -962,7 +962,7 @@ function scoreboard(){
 function endMatch(){
   if (!match) return;
   const m = match, win = m.my > m.op, vs = `상대 전력 ${fmt(m.en)} / 우리 전력 ${fmt(teamPow())}`; let html;
-  mode = 'train'; match = null; ball = null;
+  mode = 'train'; match = null; ball = null; dqHit('match');
   if (win) {
     const stage = m.type === 'stage', gold = (stage ? 50 : 100) * m.lvl * goldMult(), gem = stage ? 10 : 15 + (m.lvl % 5 === 0 ? 15 : 0);
     S.gold += gold; S.gem += gem;
@@ -1002,7 +1002,7 @@ function breakThrough(id){
   save(); hud(); renderPanel(); playerModal(id);
 }
 function trainUp(k, n){
-  for (let i = 0; i < n; i++) { const c = trainCost(k); if (S.gold < c) break; S.gold -= c; S.train[k]++; }
+  for (let i = 0; i < n; i++) { const c = trainCost(k); if (S.gold < c) break; S.gold -= c; S.train[k]++; dqHit('train'); }
   save(); hud(); renderPanel();
 }
 function rollRarity(){
@@ -1028,7 +1028,7 @@ function dungeon(k){
   if (S.dgKeys[k] <= 0) return;
   const lv = S.dg[k], win = teamPow() >= dgPow(lv), name = DG.find(d => d[0] === k)[1];
   if (!win && lv === 1) return modal(`<h2>${name} 1단계 실패</h2><p class="muted">상대 전력 ${fmt(dgPow(1))} / 우리 전력 ${fmt(teamPow())}<br>열쇠는 쓰이지 않았습니다.</p>`, [{label:'확인'}]);
-  S.dgKeys[k]--; if (win) S.dg[k]++;
+  S.dgKeys[k]--; if (win) S.dg[k]++; dqHit('dungeon');
   const text = dgReward(k, win ? lv : lv - 1);
   sfx(659, .1); sfx(880, .18, 'square', .1);
   save(); hud(); renderPanel();
@@ -1048,7 +1048,7 @@ function attend(){
     <p class="muted" style="text-align:center">매일 접속하면 7일째에 큰 보상!</p>`, [{label: '받았어요'}]);
 }
 function dots(){
-  const claim = MISSIONS.some(m => S.ms[m.id] >= msTarget(m));
+  const claim = MISSIONS.some(m => S.ms[m.id] >= msTarget(m)) || dqReady();
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('dot', b.dataset.tab === 'match' && claim));
 }
 function daily(){
@@ -1060,7 +1060,7 @@ function daily(){
 function draw(n, free, pickup){
   const cost = free ? 0 : DRAW_COST[n];
   if (S.gem < cost) return;
-  S.gem -= cost;
+  S.gem -= cost; dqHit('scout');
   const got = [], cnt = {B:0, A:0, S:0, SS:0};
   for (let i = 0; i < n; i++) { const c = pickCard(rollRarity(), pickup); got.push([c, addCard(c)]); cnt[c.rar]++; }
   S.pity += n;
@@ -1247,6 +1247,24 @@ function renderSpon(){
 // ===== 미션 / 상점 =====
 const msTarget = m => m.base * Math.pow(2, S.msLv[m.id]);
 const msReward = m => ({gem: Math.min(30, 5 + 5 * S.msLv[m.id]), coupon: 3 + S.msLv[m.id]});
+// 오늘의 할 일: 매일 새로 시작. 하나 끝낼 때마다 보석, 다 끝내면 보너스
+const DQ = [['match', '경기 1번 하기 (리그·탑)', 20], ['train', '훈련 1번 올리기', 20], ['scout', '스카우트 1번 하기', 20], ['dungeon', '재료 던전 1번 가기', 20], ['ad', '광고 보고 보상 1번 받기', 20]], DQ_ALL = 50;
+function dqDay(){ if (!S.dq || S.dq.day !== today()) S.dq = {day: today(), done: {}, got: {}, all: false}; return S.dq; }
+function dqHit(id){ try { const q = dqDay(); if (!q.done[id]) { q.done[id] = true; dots(); } } catch (e) {} }
+function dqClaim(id){
+  const q = dqDay(), d = DQ.find(x => x[0] === id);
+  if (id === 'all') { if (q.all || !DQ.every(x => q.got[x[0]])) return; q.all = true; S.gem += DQ_ALL; }
+  else { if (!d || !q.done[id] || q.got[id]) return; q.got[id] = true; S.gem += d[2]; }
+  sfx(880, .08); sfx(1320, .15, 'square', .08); save(); hud(); renderPanel();
+}
+const dqReady = () => { const q = dqDay(); return DQ.some(x => q.done[x[0]] && !q.got[x[0]]) || (!q.all && DQ.every(x => q.got[x[0]])); };
+function dqHtml(){
+  const q = dqDay(), n = DQ.filter(x => q.got[x[0]]).length, allOk = n === DQ.length;
+  return `<h3>${ic('calendar',22)}오늘의 할 일 <span class="muted" style="font-size:13px">${n} / ${DQ.length}</span></h3>
+    ${DQ.map(([id, name, g]) => `<div class="row"><span>${q.got[id] ? '✅' : q.done[id] ? '🎉' : '⬜'} ${name}<br><span class="muted">보석 ${g}</span></span>${q.got[id] ? '<span class="muted">받음</span>' : `<button onclick="dqClaim('${id}')" ${q.done[id] ? '' : 'disabled'}>받기</button>`}</div>`).join('')}
+    <div class="row"><span><b>전부 끝내기 보너스</b><br><span class="muted">보석 ${DQ_ALL}</span></span>${q.all ? '<span class="muted">받음</span>' : `<button onclick="dqClaim('all')" ${allOk ? '' : 'disabled'}>받기</button>`}</div>
+    <p class="muted">매일 자정에 새로 시작됩니다.</p>`;
+}
 function claimMission(id){
   const m = MISSIONS.find(x => x.id === id);
   if (S.ms[id] < msTarget(m)) return;
@@ -1270,7 +1288,7 @@ function adsLeft(type){
 const adBtn = (type, fn, label) => `<button class="big ad" onclick="${fn}()" ${adsLeft(type) <= 0 ? 'disabled' : ''}>${ic('ad', 20)} ${S.noAds ? '' : '광고 보고 '}${label} <span class="muted" style="color:#234">(오늘 ${adsLeft(type)}회 남음)</span></button>`;
 function showAd(type, onReward){
   if (adsLeft(type) <= 0) return;
-  S.ads[type] = (S.ads[type] || 0) + 1;
+  S.ads[type] = (S.ads[type] || 0) + 1; dqHit('ad');
   if (S.noAds) { onReward(); save(); hud(); renderPanel(); return; }   // 광고 제거 구매자는 바로 보상
   let n = 3;
   const tick = () => {
@@ -1346,7 +1364,7 @@ function renderPanel(){
       rows.push(`<div class="row"><span>${chapterOf(i * 10)}장 ${roundOf(i * 10)}라운드${i % 3 === 0 ? ' <b>(승격전)</b>' : ''}</span>
         <span class="muted">무료 보석 ${m.free} ${got ? '✔' : ''} · <span style="color:${S.pass ? '#ffb52e' : '#9aa6c8'}">패스 보석 +${m.pass} ${pgot ? '✔' : S.pass ? '' : '(잠김)'}</span></span></div>`);
     }
-    p.innerHTML = `<h3>${ic('board',22)}미션</h3>
+    p.innerHTML = dqHtml() + `<h3 style="margin-top:14px">${ic('board',22)}미션</h3>
       ${MISSIONS.map(m => { const tgt = msTarget(m), cur = S.ms[m.id], r = msReward(m);
         return `<div class="row"><span><b>${m.name} ${fmt(Math.min(cur, tgt))} / ${fmt(tgt)}</b><br><span class="muted">보석 ${r.gem} · 스폰서십 쿠폰 ${r.coupon}장</span></span><button onclick="claimMission('${m.id}')" ${cur >= tgt ? '' : 'disabled'}>받기</button></div>`; }).join('')}
       <p class="muted">달성할 때마다 다음 목표가 2배가 되고 보상도 조금씩 커집니다.</p>
@@ -1992,7 +2010,6 @@ setInterval(() => { if (S.started) { daily(); save(); hud(); } }, 5000);
 setInterval(sponsorTick, 3000);
 addEventListener('pagehide', () => { if (S.started) save(); });
 
-daily();
 if (!S.started) intro(0);
 else {
   const sec = Math.min((Date.now() - S.last) / 1000, offCap());
@@ -2004,6 +2021,7 @@ else {
        {label:(S.noAds ? '' : '광고 보고 ') + '2배', cls:'ad', fn:() => { if (adsLeft('offline') > 0) showAd('offline', () => done(awayApply(sec, 2))); else done(awayApply(sec, 1)); }}]);
   }
 }
+daily();   // 방치 보상 창이 먼저 뜨고, 출석 창은 그 창을 닫은 뒤에 뜬다
 loadSheet(); loadProps();
 
 // ===== 시작 화면 =====
