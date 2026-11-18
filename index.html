@@ -43,6 +43,13 @@ window.addEventListener('error', function(e){
   canvas{display:block;width:100%;image-rendering:pixelated;image-rendering:crisp-edges}
   #judge{position:absolute;left:0;right:0;top:14%;text-align:center;font-weight:900;font-size:22px;text-shadow:2px 2px 0 #000;pointer-events:none;opacity:0;transition:opacity .25s;color:#fff}
   #judge small{display:block;font-size:13px;color:#fff}
+  #judge{font-size:26px;letter-spacing:.01em;text-shadow:-2px -2px 0 #14234d,2px -2px 0 #14234d,-2px 2px 0 #14234d,2px 2px 0 #14234d,0 -2px 0 #14234d,0 2px 0 #14234d,-2px 0 0 #14234d,2px 0 0 #14234d,0 5px 0 #14234d,0 7px 10px rgba(0,0,0,.35)}
+  #judge small{margin-top:3px;text-shadow:-1px -1px 0 #14234d,1px -1px 0 #14234d,-1px 1px 0 #14234d,1px 1px 0 #14234d,0 2px 0 #14234d}
+  #judge.pop{animation:judgePop .38s cubic-bezier(.2,1.6,.4,1)}
+  @keyframes judgePop{0%{transform:scale(.3);opacity:0}55%{transform:scale(1.18);opacity:1}100%{transform:scale(1)}}
+  #stage canvas{filter:saturate(1.22) brightness(1.06) contrast(1.06)}
+  .ft{position:absolute;transform:translate(-50%,0);font:900 14px sans-serif;white-space:nowrap;pointer-events:none;display:flex;align-items:center;gap:2px;text-shadow:-1px -1px 0 #14234d,1px -1px 0 #14234d,-1px 1px 0 #14234d,1px 1px 0 #14234d,0 2px 0 #14234d;animation:ftUp .95s ease-out forwards}
+  @keyframes ftUp{0%{transform:translate(-50%,0) scale(.5);opacity:0}18%{transform:translate(-50%,-8px) scale(1.2);opacity:1}100%{transform:translate(-50%,-44px) scale(1);opacity:0}}
   #score{position:absolute;left:0;right:0;top:4px;text-align:center;font-weight:900;font-size:16px;text-shadow:2px 2px 0 #000;pointer-events:none;color:#fff}
   #boost{position:absolute;right:6px;bottom:6px;font-size:11px;background:#e8483f;color:#fff;padding:2px 8px;border:2px solid #7a1410;border-radius:10px;display:none}
   /* 경기장 광고판: 터치 영역(코트) 바깥에 둔다. 실제 출시 시 이 자리에 배너 광고가 들어간다 */
@@ -151,7 +158,7 @@ window.addEventListener('error', function(e){
     <div id="bootHero"></div>
     <div id="bootBar"><i></i></div>
     <div id="bootMsg">Loading…</div>
-    <div id="bootCopy">© BAEBAE Studio · v1118d</div>
+    <div id="bootCopy">© BAEBAE Studio · v1118e</div>
   </div>
   <div id="bootStudio">
     <div class="mark"><img id="studioLogo" src="assets/brand/studio_logo.png" alt="" style="max-width:56vw;max-height:30vh;display:none" onload="this.style.display='block';document.getElementById('studioMark').style.display='none'" onerror="this.remove()">
@@ -835,13 +842,15 @@ function resolve(g, auto, d, w, note){
   hitAt = now; nextSpawn = now + (isAuto() ? 350 : 700);
   burst(x, y, g);
   if (g === 'perfect') shakeUntil = now + 160;
-  if (!auto) hitSfx(g);
+  if (!auto) hitSfx(g); else if (!S.mute) tone(150, .1, 'sine', 0, .07, sfxBus, .5);   // 자동 진행 중엔 작은 '퍽'
   const rate = auto ? 50 : g === 'bad' ? 20 : Math.round(100 - d / w.o * 50);
   showJudge(GRADE[g].label + (auto ? ' (자동)' : ''), GRADE[g].color, (note ? note + ' · ' : '') + '성공률 ' + rate + '%');
   if (g === 'perfect') S.ms.perfect++;
   if (mode === 'train') {
     stats[g]++;
+    const g0 = S.gold;
     trainGain(1, GRADE[g].mult * (auto ? idleMult() : 1) * (boosted() ? 2 : 1) * onBonus());
+    if (S.gold > g0) floatTxt(ic('coin', 13) + '+' + fmt(S.gold - g0), x, y - 6, g === 'perfect' ? '#ffe35a' : '#fff');
     leaguePoint(g);
     if (tab === 'train') renderPanel();
   } else matchPoint(g);
@@ -858,11 +867,11 @@ function leaguePoint(g){
     lg = {my:0, op:0, perf:0};
     if (win) {
       S.rank += rp; const gold = clearRound(true);
-      cheerUntil = performance.now() + 1800; sfx(523, .1); sfx(659, .1, 'square', .1); sfx(784, .22, 'square', .2);
+      cheerUntil = performance.now() + 1800; SND.fanfare(); SND.cheer();
       showJudge(boss ? '승격전 승리!' : '라운드 클리어!', '#58d26b', `운영비 +${fmt(gold)} · 접속 보너스 +${Math.round((onBonus() - 1) * 100)}%`);
       checkLeagueStory();
     }
-    else showJudge('패배 — 재도전', '#e8483f', '직접 조종하거나 전력을 키워 보세요');
+    else { SND.fail(); showJudge('패배 — 재도전', '#e8483f', '직접 조종하거나 전력을 키워 보세요'); }
     save(); hud(); renderPanel();
   }
   scoreboard();
@@ -917,11 +926,19 @@ function awayApply(sec, mult){
   scoreboard(); save(); hud(); renderPanel();
   return n;
 }
+// 코트 위에 떠오르는 숫자 (+운영비 등). x, y는 코트 좌표(180×160)
+function floatTxt(html, x, y, color = '#fff'){
+  const st = $('stage'); if (!st || st.querySelectorAll('.ft').length > 6) return;
+  const e = document.createElement('div'); e.className = 'ft'; e.innerHTML = html; e.style.color = color;
+  e.style.left = (x / 180 * 100) + '%'; e.style.top = (y / 160 * 100) + '%';
+  st.appendChild(e); setTimeout(() => e.remove(), 950);
+}
 let judgeTimer;
 function showJudge(text, color, sub){
   const j = $('judge');
   j.innerHTML = text + (sub ? '<small>' + sub + '</small>' : '');
   j.style.color = color; j.style.opacity = 1;
+  j.classList.remove('pop'); void j.offsetWidth; j.classList.add('pop');   // 글자가 '팡' 하고 튀어나온다
   clearTimeout(judgeTimer); judgeTimer = setTimeout(() => j.style.opacity = 0, 600);
 }
 
@@ -973,6 +990,7 @@ function endMatch(){
   } else if (m.type === 'stage') { S.rank = Math.max(0, S.rank - 3); html = `<h2>패배…</h2>${vs}<br>선수를 키우고 스태프를 영입해 다시 도전하세요.<br>랭킹 점수 -3`; }
   else html = `<h2>${m.lvl}층 실패</h2>${vs}`;
   scoreboard(); save(); hud(); renderPanel();
+  if (win) { SND.fanfare(); SND.cheer(); } else SND.fail();
   modal(html, [{label:'확인'}]);
 }
 
@@ -1325,11 +1343,17 @@ rotateAd(); setInterval(rotateAd, 30000);
 // 코트 벽면의 스폰서 보드(장식). 단장 레벨이 오를수록 보드가 채워진다
 const BOARD_COLORS = ['#e8483f','#3f8de8','#58d26b','#f2c230','#c084ff','#ff8a3d'];
 function drawBoards(now){
+  // 코트 옆 전광판 광고: 영입한 마케터 수만큼 켜진다. 꺼진 칸은 어두운 화면, 켜진 칸은 공 로고 + 반짝임
   const n = Math.min(6, 1 + S.staff.gm);
+  R(0, 97, 180, 1, '#0d1430'); R(0, 108, 180, 1, '#0d1430');
   for (let i = 0; i < 6; i++) {
-    const x = i * 30, on = i < n;
-    R(x, 99, 29, 9, on ? BOARD_COLORS[(i + Math.floor(now / 4000)) % 6] : bg ? 'rgba(20,24,44,.35)' : '#1c2444');
-    if (on) { R(x+4, 102, 5, 3, '#fff'); R(x+11, 102, 14, 1, '#fff'); R(x+11, 104, 9, 1, '#fff'); }
+    const x = i * 30, on = i < n, c = BOARD_COLORS[(i + Math.floor(now / 4000)) % 6];
+    R(x, 98, 30, 10, '#1d2b55'); R(x + 1, 99, 28, 8, on ? c : '#24345f');
+    if (on) {
+      R(x + 3, 100, 6, 6, '#fff'); R(x + 4, 101, 4, 4, c); R(x + 5, 100, 1, 6, '#fff'); R(x + 3, 102, 6, 1, '#fff');   // 공 로고
+      R(x + 11, 101, 15, 2, '#fff'); R(x + 11, 104, 10, 1, 'rgba(255,255,255,.75)');
+      const sx = ((now / 18 + i * 37) % 60) - 15; if (sx > 0 && sx < 27) R(x + 1 + sx, 99, 2, 8, 'rgba(255,255,255,.35)');   // 반짝이며 지나가는 빛
+    } else for (let k = 0; k < 4; k++) R(x + 5 + k * 6, 102, 2, 2, '#33467a');
   }
 }
 function renderPanel(){
@@ -1437,7 +1461,8 @@ function renderPanel(){
       </div>
       <button class="big sub" onclick="clubSetup(() => { renderPanel(); })">${emblemIc(S.club ? S.club.emb : 0, S.club ? S.club.col : 0, 20)} 구단 이름·엠블럼 바꾸기</button>
         <button class="big sub" onclick="toggleLang()">언어: ${LANG === 'ko' ? '한국어' : 'English'} (지금은 선수·포지션·국가 이름만 바뀜)</button>
-      <button class="big sub" onclick="toggleShop('mute')">효과음: ${S.mute ? '꺼짐' : '켜짐'}</button>
+      <button class="big sub" onclick="toggleShop('mute')">${ic(S.mute ? 'mute' : 'sound', 18)} 효과음: ${S.mute ? '꺼짐' : '켜짐'}</button>
+      <button class="big sub" onclick="toggleBgm()">${ic(S.bgmOff ? 'mute' : 'sound', 18)} 배경음악: ${S.bgmOff ? '꺼짐' : '켜짐'}</button>
       <button class="big sub" onclick="askReset()">처음부터 다시 시작</button>`;
   } else {
     const sw = (key, name, desc) => `<div class="row"><span><b>${name}</b><br><span class="muted">${desc}</span></span><button class="${S[key] ? '' : 'sub'}" onclick="toggleShop('${key}')">${S[key] ? '보유 중' : '구매한 척'}</button></div>`;
@@ -1455,7 +1480,7 @@ function renderPanel(){
 function modal(html, btns){
   paused = true;
   $('modalBox').innerHTML = html + (btns.length ? '<div class="btns">' + btns.map((b,i) => `<button class="${b.cls||''}" data-i="${i}">${b.label}</button>`).join('') + '</div>' : '');
-  $('modalBox').querySelectorAll('.btns button').forEach(el => el.onclick = () => { closeModal(); const f = btns[el.dataset.i].fn; if (f) f(); });
+  $('modalBox').querySelectorAll('.btns button').forEach(el => el.onclick = () => { try { SND.click(); } catch (e) {} closeModal(); const f = btns[el.dataset.i].fn; if (f) f(); });
   $('modal').style.display = 'flex';
 }
 function closeModal(){ $('modal').style.display = 'none'; paused = false; }
@@ -1911,23 +1936,79 @@ function drawCrowd(now){
     R(x, y, 3, 2, '#f0c090'); R(x - 1, y + 2, 5, 4, CROWD[(k * 7) % 6]);
   }
 }
-let actx = null;
-function initAudio(){ if (!actx && !S.mute) try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
-function sfx(f, d = .08, type = 'square', at = 0){
-  if (!actx || S.mute) return;
+// ----- 소리: 효과음 버스(부드럽게 깎은 음색 + 압축) / 배경음악 버스를 따로 둔다 -----
+let actx = null, sfxBus = null, bgmBus = null, noiseBuf = null;
+function initAudio(){
+  if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
   try {
-    const o = actx.createOscillator(), gn = actx.createGain(), t = actx.currentTime + at;
-    o.type = type; o.frequency.value = f;
-    gn.gain.setValueAtTime(.05, t); gn.gain.exponentialRampToValueAtTime(.0001, t + d);
-    o.connect(gn); gn.connect(actx.destination); o.start(t); o.stop(t + d);
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    const comp = actx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4; comp.connect(actx.destination);
+    sfxBus = actx.createGain(); sfxBus.gain.value = 1; sfxBus.connect(comp);
+    bgmBus = actx.createGain(); bgmBus.gain.value = .55; bgmBus.connect(comp);
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * .5, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    bgmStart();
   } catch(e){}
 }
-function hitSfx(grade){
-  if (grade === 'perfect') { sfx(880, .07); sfx(1320, .12, 'square', .07); }
-  else if (grade === 'great') sfx(660, .1);
-  else if (grade === 'good') sfx(440, .08);
-  else sfx(150, .18, 'sawtooth');
+['pointerdown', 'touchend', 'keydown'].forEach(ev => addEventListener(ev, initAudio, {passive: true}));   // 아이폰은 첫 터치 때만 소리를 켤 수 있다
+// 음 하나: 살짝 올라오고(어택) 부드럽게 사라진다. 사각파는 고음을 깎아서 귀가 덜 아프게
+function tone(f, d, type = 'square', at = 0, vol = .06, bus = sfxBus, slide = 0){
+  if (!actx || !bus) return;
+  try {
+    const t = actx.currentTime + at, o = actx.createOscillator(), gn = actx.createGain(), lp = actx.createBiquadFilter();
+    o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f * slide), t + d);
+    lp.type = 'lowpass'; lp.frequency.value = type === 'square' || type === 'sawtooth' ? 3200 : 9000;
+    gn.gain.setValueAtTime(.0001, t); gn.gain.exponentialRampToValueAtTime(vol, t + .006); gn.gain.exponentialRampToValueAtTime(.0001, t + d);
+    o.connect(lp); lp.connect(gn); gn.connect(bus); o.start(t); o.stop(t + d + .02);
+  } catch(e){}
 }
+function noise(d, at = 0, vol = .1, freq = 1800, q = .8, bus = sfxBus){
+  if (!actx || !bus) return;
+  try {
+    const t = actx.currentTime + at, s = actx.createBufferSource(), f = actx.createBiquadFilter(), gn = actx.createGain();
+    s.buffer = noiseBuf; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+    gn.gain.setValueAtTime(vol, t); gn.gain.exponentialRampToValueAtTime(.0001, t + d);
+    s.connect(f); f.connect(gn); gn.connect(bus); s.start(t); s.stop(t + d + .02);
+  } catch(e){}
+}
+function sfx(f, d = .08, type = 'square', at = 0){ if (!S.mute) tone(f, d, type, at, .05); }   // 예전 호출과 호환
+const SND = {
+  thump(){ if (S.mute) return; tone(140, .16, 'sine', 0, .22, sfxBus, .45); noise(.07, 0, .18, 2400, 1.2); },            // 공 때리는 소리
+  coin(){ if (S.mute) return; tone(1318, .09, 'triangle', 0, .07); tone(1976, .22, 'triangle', .07, .06); },
+  click(){ if (S.mute) return; tone(880, .05, 'triangle', 0, .05, sfxBus, 1.4); },
+  cheer(){ if (S.mute) return; noise(1.1, 0, .05, 1200, .5); noise(.9, .1, .04, 2600, .6); },                            // 관중 함성
+  fanfare(){ if (S.mute) return; [523, 659, 784, 1047].forEach((f, i) => tone(f, i === 3 ? .4 : .12, 'square', i * .1, .05)); tone(262, .5, 'triangle', .3, .08); },
+  fail(){ if (S.mute) return; tone(330, .18, 'square', 0, .04, sfxBus, .7); tone(220, .3, 'square', .16, .04, sfxBus, .7); }
+};
+function hitSfx(grade){
+  SND.thump();
+  if (grade === 'perfect') { sfx(1047, .07); sfx(1568, .16, 'square', .06); noise(.12, 0, .08, 5000, .7); }
+  else if (grade === 'great') sfx(784, .12);
+  else if (grade === 'good') sfx(523, .08, 'triangle');
+  else tone(150, .2, 'sawtooth', 0, .04, sfxBus, .6);
+}
+// ----- 배경음악: 밝은 4마디 반복 (C-G-Am-F). 직접 합성이라 파일이 필요 없다 -----
+const BGM_BPM = 112, BGM_CH = [[48, 52, 55], [43, 47, 50], [45, 48, 52], [41, 45, 48]];
+const BGM_MEL = [72,0,76,79, 77,76,74,0, 74,0,71,74, 76,74,72,0, 72,0,76,72, 69,0,72,76, 77,0,76,74, 72,74,76,0];
+let bgmTimer = null, bgmStep = 0, bgmNext = 0;
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function bgmStart(){
+  if (bgmTimer || !actx) return;
+  bgmNext = actx.currentTime + .1;
+  bgmTimer = setInterval(() => {
+    if (S.bgmOff || document.hidden) { bgmNext = actx.currentTime + .1; return; }
+    const st = 60 / BGM_BPM / 2;                                         // 8분음표
+    while (bgmNext < actx.currentTime + .25) {
+      const at = bgmNext - actx.currentTime, i = bgmStep % 32, ch = BGM_CH[Math.floor(i / 8)];
+      if (i % 2 === 0) tone(mtof(ch[0] - 12 + (i % 4 === 2 ? 7 : 0)), st * 1.6, 'triangle', at, .09, bgmBus);   // 베이스
+      if (i % 4 === 1 || i % 4 === 3) tone(mtof(ch[(i >> 1) % 3] + 12), st * .7, 'square', at, .018, bgmBus);   // 반주
+      const m = BGM_MEL[i]; if (m) tone(mtof(m), st * .9, 'square', at, .028, bgmBus);                          // 멜로디
+      noise(.03, at, i % 4 === 2 ? .05 : .02, 7000, 1, bgmBus);                                                  // 하이햇
+      bgmNext += st; bgmStep++;
+    }
+  }, 50);
+}
+function toggleBgm(){ S.bgmOff = !S.bgmOff; save(); renderPanel(); }
 
 // ===== 스폰서십 애니메이션 (마케터가 서류를 던져 목표를 따온다) =====
 const spcv = $('spcv'), sctx = spcv.getContext('2d');
@@ -1943,16 +2024,17 @@ function drawIcon(t, cx, cy){
 function drawSpon(now){
   if (!S.started) return;
   G = sctx; shx = shy = 0;
-  R(0,0,180,30,'#0f1322'); R(0,29,180,1,'#2a3050');
+  R(0,0,180,30,'#cfe8ff'); R(0,20,180,10,'#b6d9fb'); R(0,29,180,1,'#7fb2ea');               // 밝은 하늘색 무대
   // 1.2초짜리 연출: 던지기(0~.33) → 성공: 도장 쾅(.33~.6) → 보상 들고 복귀(.6~1) / 실패: 서류가 흘러내림(.33~1)
   const a = spAnim && now - spAnim.t0 < 1200 ? spAnim : null, u = a ? (now - a.t0) / 1200 : 0;
-  if (a && a.ok && u >= .45 && u < .55) { shy = 1; R(0,-1,180,32,'#0f1322'); R(0,29,180,1,'#2a3050'); }   // 도장 찍히는 순간 흔들림
+  if (a && a.ok && u >= .45 && u < .55) { shy = 1; R(0,-1,180,32,'#cfe8ff'); R(0,20,180,10,'#b6d9fb'); R(0,29,180,1,'#7fb2ea'); }   // 도장 찍히는 순간 흔들림
   drawPlayer(14, 29, '#3a4a7a', a && u < .3 ? u / .3 * .99 : 9, 1, 0, MK_LOOK, POSE.spike);   // 마케터
   R(12,21,4,1,'#f4f1e6'); R(13,22,2,3,'#e8483f');                                    // 셔츠 깃과 넥타이
   S.targets.forEach((t, i) => {
     const cx = (i + 1.5) * 30, sel = a && a.idx === i && u >= .33;
     const c = sel ? (a.ok ? '#58d26b' : '#e8483f') : spColor(t), x0 = cx - 10;
-    R(x0,3,20,24,'#1b1f33'); R(x0,3,20,1,c); R(x0,26,20,1,c); R(x0,3,1,24,c); R(x0+19,3,1,24,c);
+    R(x0+1,4,20,24,'rgba(30,70,140,.25)');                                            // 그림자
+    R(x0,3,20,24,sel && a.ok ? '#eaffea' : '#ffffff'); R(x0+1,4,18,6,'#f2f8ff'); R(x0,3,20,1,c); R(x0,26,20,1,c); R(x0,3,1,24,c); R(x0+19,3,1,24,c);
     const shown = sel && a.ok && u < .6 ? a.t : t;                                   // 성공 연출 중엔 따낸 목표를 계속 보여 준다
     drawIcon(shown, cx, 13);
     for (let k = 0; k < shown.tier; k++) R(cx - shown.tier * 1.5 + k * 3, 22, 2, 2, spColor(shown));   // 등급 표시
