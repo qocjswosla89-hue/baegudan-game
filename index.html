@@ -13,11 +13,11 @@ window.__A = {"assets/bg/city.png":"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAA
 </script>
 <script>
 // 오류가 나면 화면 아래에 빨간 글씨로 보여 준다 (폰에서 원인을 찾기 위한 장치)
+window.addEventListener('unhandledrejection', function(e){ var d = document.getElementById('errBox'); if (!d) { d = document.createElement('div'); d.id = 'errBox'; d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99;background:#c0392b;color:#fff;font:11px/1.4 sans-serif;padding:6px 8px'; (document.body || document.documentElement).appendChild(d); } d.textContent += 'promise: ' + (e.reason && e.reason.message || e.reason) + '\n'; });
 window.addEventListener('error', function(e){
   var d = document.getElementById('errBox');
   if (!d) { d = document.createElement('div'); d.id = 'errBox'; d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99;background:#c0392b;color:#fff;font:11px/1.4 sans-serif;padding:6px 8px;max-height:30%;overflow:auto;white-space:pre-wrap'; (document.body || document.documentElement).appendChild(d); }
-  d.textContent += (e.message || 'error') + ' @' + (e.lineno || '?') + '
-';
+  d.textContent += (e.message || 'error') + ' @' + (e.lineno || '?') + '\n';
 });
 </script>
 
@@ -149,7 +149,7 @@ window.addEventListener('error', function(e){
     <div id="bootHero"></div>
     <div id="bootBar"><i></i></div>
     <div id="bootMsg">Loading…</div>
-    <div id="bootCopy">© BAEBAE Studio</div>
+    <div id="bootCopy">© BAEBAE Studio · v1118b</div>
   </div>
   <div id="bootStudio">
     <div class="mark"><img id="studioLogo" src="assets/brand/studio_logo.png" alt="" style="max-width:56vw;max-height:30vh;display:none" onload="this.style.display='block';document.getElementById('studioMark').style.display='none'" onerror="this.remove()">
@@ -1431,8 +1431,10 @@ function askReset(){
 function intro(i){
   if (i < STORY.length) return modal(`<p>${STORY[i]}</p>`, [{label: i < STORY.length - 1 ? '다음' : '새 출발', fn:() => intro(i + 1)}]);
   S.cards = {}; S.trainee = null;
-  clubSetup(() => draftRound(0, false), true);
+  try { clubSetup(() => draftRound(0, false), true); }
+  catch (e) { showErr('이름 정하기 오류: ' + e.message); draftRound(0, false); }   // 실패해도 게임은 이어진다
 }
+function showErr(m){ var d = document.getElementById('errBox'); if (!d) { d = document.createElement('div'); d.id = 'errBox'; d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99;background:#c0392b;color:#fff;font:11px/1.4 sans-serif;padding:6px 8px;max-height:30%;overflow:auto;white-space:pre-wrap'; document.body.appendChild(d); } d.textContent += m + '\n'; }
 // 새 구단 이름과 엠블럼 고르기 (처음 시작할 때와 구단 탭에서 바꿀 때)
 // 이름은 두 칸: 앞 칸(사람·지역 이름, 예: 준형) + 뒤 칸(팀 별명, 예: 타이거즈). 직접 쓰거나 랜덤 버튼으로 조합한다.
 const NAME_A = ['준형', '서울', '부산', '한강', '태백', '불꽃', '은하', '새벽', '번개', '청춘', '한울', '바다', '하늘', '별빛', '마루', '다온', '무등', '백두', '푸른', '황금'];
@@ -1473,7 +1475,7 @@ function clubForm(first){
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">${EMB_SHAPES.map((_, i) => `<div onclick="clubPick('emb',${i},${f})" style="text-align:center;padding:6px 0;border-radius:12px;border:3px solid ${i === d.emb ? '#ff9a14' : '#cfe0f7'};background:${i === d.emb ? '#fff3cf' : '#fff'};cursor:pointer">${emblemIc(i, d.col, 44)}</div>`).join('')}</div>
     <div class="muted" style="margin:8px 0 2px">색</div>
     <div style="display:flex;gap:8px;justify-content:center">${EMB_COL.map((c, i) => `<div onclick="clubPick('col',${i},${f})" style="width:34px;height:34px;border-radius:50%;background:linear-gradient(${c[0]},${c[1]});border:4px solid ${i === d.col ? '#ff9a14' : c[2]};cursor:pointer"></div>`).join('')}</div>
-    <div class="btns"><button class="big" onclick="clubConfirm()">${first ? '이 이름으로 시작' : '저장'}</button></div>`, []);
+    <div style="margin-top:12px"><button class="big" onclick="clubConfirm()">${first ? '이 이름으로 시작' : '저장'}</button></div>`, []);
 }
 function clubPick(k, v, first){ clubDraft[k] = v; clubForm(first); }
 function clubConfirm(){
@@ -1486,7 +1488,8 @@ function clubConfirm(){
 }
 
 // 긴급 드래프트: 포지션 6자리를 한 명씩 지명. 1순위 지명권(레어)은 한 번만 쓸 수 있다.
-function draftRound(i, topUsed){
+function draftRound(i, topUsed){ try { draftRound2(i, topUsed); } catch (e) { showErr('드래프트 오류: ' + e.message + ' @' + (e.stack || '').split('\n')[0]); } }
+function draftRound2(i, topUsed){
   if (i >= SLOTS.length) {
     S.started = true; if (!S.trainee) S.trainee = lineup()[0].id;
     lg = {my:0, op:0, perf:0};
