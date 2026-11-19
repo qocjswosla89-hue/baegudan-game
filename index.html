@@ -174,7 +174,7 @@ window.addEventListener('error', function(e){
     <div id="bootHero"></div>
     <div id="bootBar"><i></i></div>
     <div id="bootMsg">Loading…</div>
-    <div id="bootCopy">© BAEBAE Studio · v1118n</div>
+    <div id="bootCopy">© BAEBAE Studio · v1118o</div>
   </div>
   <div id="bootStudio">
     <div class="mark"><img id="studioLogo" src="assets/brand/studio_logo.png" alt="" style="max-width:56vw;max-height:30vh;display:none" onload="this.style.display='block';document.getElementById('studioMark').style.display='none'" onerror="this.remove()">
@@ -2196,6 +2196,18 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => { tab = b
 setInterval(() => { if (S.started) { daily(); save(); hud(); } }, 5000);
 setInterval(sponsorTick, 3000);
 addEventListener('pagehide', () => { if (S.started) save(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && S.started) save(); });   // 갤럭시는 앱을 내리면 바로 꺼버리기도 해서 내릴 때 저장
+// 뒤로가기 버튼(갤럭시): 창이 떠 있으면 무시하고, 아니면 "한 번 더 누르면 종료" 안내
+let backAt = 0;
+try { history.pushState({g: 1}, ''); } catch (e) {}
+addEventListener('popstate', () => {
+  const busy = $('modal').style.display === 'flex' || $('ssfx') || document.getElementById('boot');
+  if (!busy && Date.now() - backAt < 2000) { if (S.started) save(); history.back(); return; }
+  try { history.pushState({g: 1}, ''); } catch (e) {}
+  if (!busy) { backAt = Date.now(); showJudge('한 번 더 누르면 종료', '#fff', ''); }
+});
+// 홈 화면 앱: 한 번 받은 게임을 폰에 저장해 두어 인터넷이 없어도 열린다 (사이트 주소(https)에서만)
+if ('serviceWorker' in navigator && location.protocol === 'https:') addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 
 if (!S.started) intro(0);
 else {
