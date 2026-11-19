@@ -158,7 +158,7 @@ window.addEventListener('error', function(e){
     <div id="bootHero"></div>
     <div id="bootBar"><i></i></div>
     <div id="bootMsg">Loading…</div>
-    <div id="bootCopy">© BAEBAE Studio · v1118i</div>
+    <div id="bootCopy">© BAEBAE Studio · v1118j</div>
   </div>
   <div id="bootStudio">
     <div class="mark"><img id="studioLogo" src="assets/brand/studio_logo.png" alt="" style="max-width:56vw;max-height:30vh;display:none" onload="this.style.display='block';document.getElementById('studioMark').style.display='none'" onerror="this.remove()">
@@ -1638,6 +1638,17 @@ const SPR_BODY = [
   '...oooo..oooo...'
 ];
 const SPR_BODY_UP = SPR_BODY.map((r, i) => i === 1 || i === 2 ? '...ojjjnnjjjo...' : r);   // 팔을 든 자세
+// 상대 팀 모습: 리그(나라)마다 정해진 유니폼 색과 선수 얼굴
+const OPP_COL = ['#3f7fe8', '#2fa86a', '#8a4fd8', '#f08a24', '#1fb3c2', '#e84f9a', '#4a5a8a', '#c9a227', '#6b7f2a', '#d0503a'];
+let oppCache = null;
+function oppTeam(){
+  const li = leagueIdx(chapterOf(S.stage));
+  if (oppCache && oppCache.li === li) return oppCache;
+  let seed = li * 7919 + 13; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const pick = a => a[Math.floor(rnd() * a.length)];
+  const looks = [0, 1, 2].map(() => ({skin: pick(SKINS), hair: pick(HAIRS), cut: Math.floor(rnd() * 3), style: pick(GEN_STYLES), acc: '', tall: 1}));
+  return oppCache = {li, col: OPP_COL[li % OPP_COL.length], looks};
+}
 const DEF_LOOK = {skin:'#f0c090', hair:'#4a2e1a', cut:0, style:'', acc:'', tall:1};          // 상대 선수
 const MK_LOOK  = {skin:'#f0c090', hair:'#1c1614', cut:1, style:'', acc:'glasses', tall:0};   // 마케터
 const sprCache = {};
@@ -1881,9 +1892,11 @@ function drawScene(now){
   }
   if (!S.started) return;
   const p = P(), st = style(), TX = p.tx, TY = p.ty, react = st === 'react';
-  {                                                                     // 상대 선수
-    const atk = react && ball && ball.state === 'in';
-    drawPlayer(152, FLOOR, '#8a8fa8', atk ? (now - ball.cueAt) / 320 : 9, -1, 12, DEF_LOOK, POSE.spike);
+  {                                                                     // 상대 팀: 3명. 리그(나라)마다 유니폼 색과 얼굴이 바뀐다
+    const atk = react && ball && ball.state === 'in', o = oppTeam(), blk = (now - hitAt) / 360;
+    drawPlayer(170, FLOOR - 4, o.col, 9, -1, 0, o.looks[2], POSE.dig, POSE.ready);                     // 뒤: 리시브 준비
+    drawPlayer(128, FLOOR + 1, o.col, blk < 1 ? blk : 9, -1, 10, o.looks[0], POSE.jump);                // 네트 앞: 우리가 때리면 블로킹 점프
+    drawPlayer(152, FLOOR, o.col, atk ? (now - ball.cueAt) / 320 : 9, -1, 12, o.looks[1], POSE.spike); // 공격수
     if (atk) { R(151,84,2,7,'#ffe14d'); R(151,93,2,2,'#ffe14d'); }       // ! 신호
   }
   if (now - luAt > 1000) { luCache = lineup(); luAt = now; }
