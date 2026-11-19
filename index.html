@@ -158,7 +158,7 @@ window.addEventListener('error', function(e){
     <div id="bootHero"></div>
     <div id="bootBar"><i></i></div>
     <div id="bootMsg">Loading…</div>
-    <div id="bootCopy">© BAEBAE Studio · v1118g</div>
+    <div id="bootCopy">© BAEBAE Studio · v1118h</div>
   </div>
   <div id="bootStudio">
     <div class="mark"><img id="studioLogo" src="assets/brand/studio_logo.png" alt="" style="max-width:56vw;max-height:30vh;display:none" onload="this.style.display='block';document.getElementById('studioMark').style.display='none'" onerror="this.remove()">
@@ -1824,12 +1824,23 @@ function recolor(f, lk, jersey, dir){
   const mx = m.getContext('2d'); mx.translate(w, 0); mx.scale(-1, 1); mx.drawImage(c, 0, 0);
   return m;
 }
+// 선수 그리기: 서 있을 땐 숨 쉬듯 들썩이고, 점프할 땐 몸이 늘어났다가, 착지하면 살짝 눌린다. 발밑엔 그림자
 function drawPlayer(x, fy, color, phase, dir, jh = 9, lk = DEF_LOOK, actPose = POSE.jump, idlePose = POSE.idle){
-  const act = phase >= 0 && phase < 1; if (act) fy -= Math.sin(Math.PI * phase) * jh;
+  const act = phase >= 0 && phase < 1, base = fy;
+  let f = idlePose, lift = 0, sx = 1, sy = 1;
+  if (act && phase < .8) { const u = phase / .8, k = Math.sin(Math.PI * u); f = actPose; lift = k * jh; sy = 1 + .07 * k; sx = 1 - .04 * k; }   // 공중: 위아래로 늘어남
+  else if (act) { const k = Math.sin(Math.PI * (phase - .8) / .2); f = POSE.ready || idlePose; sy = 1 - .09 * k; sx = 1 + .06 * k; }      // 착지: 눌림
+  else { const b = Math.sin(performance.now() / 430 + x * .9); sy = 1 + .022 * b; sx = 1 - .01 * b; }                                       // 숨쉬기
+  fy = base - lift;
+  if (G.ellipse) {                                                     // 그림자 (높이 뜰수록 작고 옅게)
+    G.fillStyle = `rgba(20,24,50,${Math.max(.1, .3 - lift * .012)})`;
+    G.beginPath(); G.ellipse(x + shx, base + shy - .5, Math.max(3, 7.5 - lift * .25), 1.7, 0, 0, Math.PI * 2); G.fill();
+  }
   if (sheet) {
-    const f = act ? actPose : idlePose, key = [f, lk.skin, lk.hair, lk.style, lk.cut, color, dir].join();
+    const key = [f, lk.skin, lk.hair, lk.style, lk.cut, color, dir].join();
     const s = aiCache[key] || (aiCache[key] = recolor(f, lk, color, dir));
-    G.drawImage(s, Math.round((x + shx) * 2 - s.width / 2) / 2, Math.round((fy + shy) * 2 - s.height) / 2, s.width / 2, s.height / 2);
+    const w = Math.round(s.width * sx) / 2, h = Math.round(s.height * sy) / 2;
+    G.drawImage(s, Math.round((x + shx - w / 2) * 2) / 2, Math.round((fy + shy - h) * 2) / 2, w, h);
     return;
   }
   const key = [lk.skin, lk.hair, lk.cut, lk.style, lk.acc, lk.tall, lk.band, color, act ? 1 : 0, dir].join();
@@ -1874,7 +1885,7 @@ function drawScene(now){
   // 포지션별 동작: 세터는 토스, 리베로는 리시브, 블로커는 두 팔 점프, 공격수는 스파이크 (기 모을 땐 웅크림)
   const isL = me && me.pos === 'L';
   const actPose = st === 'dir' ? (isL ? POSE.dig : POSE.set) : react ? POSE.jump : POSE.spike;
-  drawPlayer(p.px, FLOOR, isL ? '#f2c230' : '#e8483f', (now - hitAt) / 320, 1, p.jh, look(me), actPose, charge || isL ? POSE.ready : POSE.idle);
+  drawPlayer(p.px, FLOOR, isL ? '#f2c230' : '#e8483f', (now - hitAt) / 320, 1, p.jh, look(me), actPose, charge || isL || (ball && ball.state === 'in' && ball.t0 - now < 420) ? POSE.ready : POSE.idle);   // 공이 다가오면 미리 자세를 잡는다
   if (charge) {                                                         // 기 모으기 게이지
     const f = Math.min(1, (now - charge.start) / CHARGE_MS);
     R(p.px-7,FLOOR-36,14,4,'#000'); R(p.px-6,FLOOR-35,Math.round(12*f),2, f >= 1 ? '#ffe14d' : '#fff');
