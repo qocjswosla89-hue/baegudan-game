@@ -100,6 +100,8 @@ window.addEventListener('error', function(e){
   nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:11px;border:0;border-radius:12px;box-shadow:none;background:transparent;color:#6a78a8;text-shadow:none;padding:5px 0 4px}
   nav button:active{transform:none}
   nav button{position:relative}
+  .bar{display:block;height:6px;margin-top:4px;border-radius:3px;background:#dfe8f7;overflow:hidden}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,#ffb52e,#ffd76a);border-radius:3px}
   nav button.dot::after{content:"";position:absolute;top:3px;right:22%;width:11px;height:11px;border-radius:50%;background:#ff3b30;border:2px solid #fff}
   nav button.on{background:linear-gradient(#ffe97a,#ffa91f);color:#6a3a00;box-shadow:inset 0 2px 0 #fff,0 3px 0 #b86400}
   nav button:disabled{background:transparent;opacity:.5;box-shadow:none}
@@ -172,7 +174,7 @@ window.addEventListener('error', function(e){
     <div id="bootHero"></div>
     <div id="bootBar"><i></i></div>
     <div id="bootMsg">Loading…</div>
-    <div id="bootCopy">© BAEBAE Studio · v1118m</div>
+    <div id="bootCopy">© BAEBAE Studio · v1118n</div>
   </div>
   <div id="bootStudio">
     <div class="mark"><img id="studioLogo" src="assets/brand/studio_logo.png" alt="" style="max-width:56vw;max-height:30vh;display:none" onload="this.style.display='block';document.getElementById('studioMark').style.display='none'" onerror="this.remove()">
@@ -920,7 +922,7 @@ function checkLeagueStory(){
   if (i <= S.seenLeague) return;
   S.seenLeague = i;
   const nat = COUNTRIES[i % COUNTRIES.length], col = OPP_COL[i % OPP_COL.length];
-  try { SND.fanfare(); SND.cheer(); } catch (e) {}
+  try { SND.fanfare(); SND.cheer(); vibe([60, 80, 60, 80, 120]); } catch (e) {}
   confetti();
   modal(`<div style="text-align:center"><div style="font-size:56px;line-height:1.1;animation:judgePop .5s cubic-bezier(.2,1.6,.4,1)">${FLAG[nat] || '🏐'}</div>
     <h2 style="margin:4px 0">${leagueName(i)}</h2>
@@ -1027,7 +1029,7 @@ function endMatch(){
   } else if (m.type === 'stage') { S.rank = Math.max(0, S.rank - 3); html = `<h2>패배…</h2>${vs}<br>선수를 키우고 스태프를 영입해 다시 도전하세요.<br>랭킹 점수 -3`; }
   else html = `<h2>${m.lvl}층 실패</h2>${vs}`;
   scoreboard(); save(); hud(); renderPanel();
-  if (win) { SND.fanfare(); SND.cheer(); } else SND.fail();
+  if (win) { SND.fanfare(); SND.cheer(); vibe([40, 60, 40]); } else { SND.fail(); vibe(120); }
   modal(html, [{label:'확인'}]);
 }
 
@@ -1103,7 +1105,7 @@ function attend(){
     <p class="muted" style="text-align:center">매일 접속하면 7일째에 큰 보상!</p>`, [{label: '받았어요'}]);
 }
 function dots(){
-  const claim = MISSIONS.some(m => S.ms[m.id] >= msTarget(m)) || dqReady();
+  const claim = MISSIONS.some(m => S.ms[m.id] >= msTarget(m)) || dqReady() || achReady();
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('dot', b.dataset.tab === 'match' && claim));
 }
 function daily(){
@@ -1148,6 +1150,7 @@ const NICK_OV = {   // SS 개별 별명 [한국어, 영어]. 없으면 나라+�
 const nickOf = c => NICK_OV[c.id] ? NICK_OV[c.id][LANG === 'ko' ? 0 : 1] : LANG === 'ko' ?NAT[c.nat][0] + '산 ' + POS_NICK[c.pos][0] : NAT[c.nat][1] + ' ' + POS_NICK[c.pos][1];
 function ssCutscene(list, done){
   if (!list.length) return done();
+  vibe([80, 50, 200]);
   if (!$('ssfxCss')) {
     const st = document.createElement('style'); st.id = 'ssfxCss';
     st.textContent = `
@@ -1335,6 +1338,36 @@ function claimMission(id){
   const r = msReward(m); S.gem += r.gem; S.coupon += r.coupon; S.msLv[id]++;
   save(); hud(); renderPanel();
 }
+// 업적: 오래 걸리는 목표. 단계마다 한 번씩 보석을 준다 (지금 상태를 보고 판정하므로 따로 세는 숫자가 거의 없다)
+const ACH = [
+  {id:'league', name:'리그 정복',     unit:'개 나라 돌파', val: () => leagueIdx(chapterOf(S.stage)),              tiers:[1, 2, 4, 8, 12, 20],      gem:[50, 80, 120, 200, 300, 500]},
+  {id:'round',  name:'라운드 돌파',   unit:'라운드',       val: () => S.ms.round,                                tiers:[30, 100, 300, 1000, 3000], gem:[30, 50, 80, 150, 300]},
+  {id:'perfect',name:'퍼펙트 장인',   unit:'번',           val: () => S.ms.perfect,                              tiers:[50, 300, 1000, 5000],     gem:[30, 60, 120, 250]},
+  {id:'tower',  name:'탑 등반가',     unit:'층',           val: () => S.floor - 1,                               tiers:[10, 30, 60, 100, 200],    gem:[40, 80, 120, 200, 300]},
+  {id:'collect',name:'선수 수집가',   unit:'명',           val: () => CARDS.filter(own).length,                  tiers:[15, 30, 45, 60],          gem:[40, 80, 150, 300]},
+  {id:'ss',     name:'슈퍼스타 영입', unit:'명',           val: () => CARDS.filter(c => own(c) && c.rar === 'SS').length, tiers:[1, 3, 5, 8],   gem:[50, 100, 150, 300]},
+  {id:'staff',  name:'사무실 완성',   unit:'명',           val: () => STAFF.filter(s => S.staff[s.id] > 0).length, tiers:[3, 6],                  gem:[30, 80]},
+  {id:'train',  name:'훈련 광',       unit:'레벨',         val: () => Object.values(S.train).reduce((a, b) => a + b, 0), tiers:[20, 100, 300, 1000], gem:[30, 60, 120, 250]}
+];
+const achLv = a => (S.ach || {})[a.id] || 0;
+const achReady = () => ACH.some(a => achLv(a) < a.tiers.length && a.val() >= a.tiers[achLv(a)]);
+function achClaim(id){
+  const a = ACH.find(x => x.id === id), lv = achLv(a);
+  if (lv >= a.tiers.length || a.val() < a.tiers[lv]) return;
+  S.ach = S.ach || {}; S.ach[id] = lv + 1; S.gem += a.gem[lv];
+  SND.coin(); vibe(30); save(); hud(); renderPanel(); dots();
+}
+function achHtml(){
+  const done = ACH.reduce((n, a) => n + achLv(a), 0), all = ACH.reduce((n, a) => n + a.tiers.length, 0);
+  return `<h3 style="margin-top:14px">${ic('trophy',22)}업적 <span class="muted" style="font-size:13px">${done} / ${all}</span></h3>
+    ${ACH.map(a => { const lv = achLv(a), max = lv >= a.tiers.length, tgt = a.tiers[Math.min(lv, a.tiers.length - 1)], cur = a.val(), pct = Math.min(100, cur / tgt * 100);
+      return `<div class="row"><span style="flex:1"><b>${a.name}</b> <span class="muted">${'★'.repeat(lv)}${'☆'.repeat(a.tiers.length - lv)}</span><br>
+        <span class="muted">${max ? '모두 달성!' : `${fmt(Math.min(cur, tgt))} / ${fmt(tgt)}${a.unit} · 보석 ${a.gem[lv]}`}</span>
+        <span class="bar"><i style="width:${max ? 100 : pct}%"></i></span></span>
+        ${max ? '<span class="muted">완료</span>' : `<button onclick="achClaim('${a.id}')" ${cur >= tgt ? '' : 'disabled'}>받기</button>`}</div>`; }).join('')}`;
+}
+// 진동: 갤럭시(안드로이드)만 된다. 아이폰 사파리는 진동을 막아 두어 조용히 넘어간다
+function vibe(ms){ try { if (!S.vibOff && navigator.vibrate && actx) navigator.vibrate(ms); } catch (e) {} }   // actx = 화면을 한 번 누른 뒤 (그 전엔 브라우저가 막는다)
 function buyGems(n){ S.gem += n; save(); hud(); renderPanel(); }          // 테스트용: 결제 없이 지급
 function gemBuy(kind){
   if (kind === 'coupon' && S.gem >= 50) { S.gem -= 50; S.coupon += 20; }
@@ -1438,6 +1471,7 @@ function renderPanel(){
       ${MISSIONS.map(m => { const tgt = msTarget(m), cur = S.ms[m.id], r = msReward(m);
         return `<div class="row"><span><b>${m.name} ${fmt(Math.min(cur, tgt))} / ${fmt(tgt)}</b><br><span class="muted">보석 ${r.gem} · 스폰서십 쿠폰 ${r.coupon}장</span></span><button onclick="claimMission('${m.id}')" ${cur >= tgt ? '' : 'disabled'}>받기</button></div>`; }).join('')}
       <p class="muted">달성할 때마다 다음 목표가 2배가 되고 보상도 조금씩 커집니다.</p>
+      ${achHtml()}
       <h3 style="margin-top:14px">${ic('gift',22)}단계 보상</h3>
       <p class="muted">10라운드를 깰 때마다 보상이 자동 지급됩니다. 시즌 패스가 있으면 한 줄을 더 받고, 나중에 사도 지나온 구간은 소급됩니다.</p>
       ${rows.join('')}
@@ -1509,6 +1543,7 @@ function renderPanel(){
         <button class="big sub" onclick="toggleLang()">언어: ${LANG === 'ko' ? '한국어' : 'English'} (지금은 선수·포지션·국가 이름만 바뀜)</button>
       <button class="big sub" onclick="toggleShop('mute')">${ic(S.mute ? 'mute' : 'sound', 18)} 효과음: ${S.mute ? '꺼짐' : '켜짐'}</button>
       <button class="big sub" onclick="toggleBgm()">${ic(S.bgmOff ? 'mute' : 'sound', 18)} 배경음악: ${S.bgmOff ? '꺼짐' : '켜짐'}</button>
+      ${navigator.vibrate ? `<button class="big sub" onclick="S.vibOff=!S.vibOff;save();renderPanel();vibe(40)">📳 진동: ${S.vibOff ? '꺼짐' : '켜짐'}</button>` : ''}
       <button class="big sub" onclick="askReset()">처음부터 다시 시작</button>`;
   } else {
     const sw = (key, name, desc) => `<div class="row"><span><b>${name}</b><br><span class="muted">${desc}</span></span><button class="${S[key] ? '' : 'sub'}" onclick="toggleShop('${key}')">${S[key] ? '보유 중' : '구매한 척'}</button></div>`;
@@ -2052,7 +2087,7 @@ const SND = {
 };
 function hitSfx(grade){
   SND.thump();
-  if (grade === 'perfect') { sfx(1047, .07); sfx(1568, .16, 'square', .06); noise(.12, 0, .08, 5000, .7); }
+  if (grade === 'perfect') { vibe(25); sfx(1047, .07); sfx(1568, .16, 'square', .06); noise(.12, 0, .08, 5000, .7); }
   else if (grade === 'great') sfx(784, .12);
   else if (grade === 'good') sfx(523, .08, 'triangle');
   else tone(150, .2, 'sawtooth', 0, .04, sfxBus, .6);
