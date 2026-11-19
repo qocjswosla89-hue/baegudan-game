@@ -23,7 +23,15 @@ window.addEventListener('error', function(e){
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>얼떨결에 구단주 (프로토타입)</title>
+<title>얼떨결에 구단주</title>
+<!-- 아이폰 '홈 화면에 추가' 하면 앱처럼 아이콘이 생기고 주소창 없이 전체 화면으로 열린다 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="얼떨결에 구단주">
+<meta name="theme-color" content="#5fb8ff">
+<link rel="apple-touch-icon" href="assets/brand/icon180.png">
+<link rel="icon" href="assets/brand/icon64.png">
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;height:100%;background:linear-gradient(#7fd0ff,#c9f0ff);color:#26335e;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:14px}
@@ -43,6 +51,9 @@ window.addEventListener('error', function(e){
   canvas{display:block;width:100%;image-rendering:pixelated;image-rendering:crisp-edges}
   #judge{position:absolute;left:0;right:0;top:14%;text-align:center;font-weight:900;font-size:22px;text-shadow:2px 2px 0 #000;pointer-events:none;opacity:0;transition:opacity .25s;color:#fff}
   #judge small{display:block;font-size:13px;color:#fff}
+  .confetti{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:60;overflow:hidden}
+  .confetti i{position:absolute;top:-20px;border-radius:2px;animation:confFall linear forwards}
+  @keyframes confFall{0%{transform:translate(0,0) rotate(0)}100%{transform:translate(var(--dx),110vh) rotate(var(--r))}}
   .storyImg{display:block;width:100%;max-height:42vh;object-fit:cover;object-position:center 40%;border-radius:14px;border:3px solid #2f7de1;margin:-4px 0 10px;image-rendering:pixelated;animation:storyIn .5s ease-out}
   @keyframes storyIn{from{opacity:0;transform:scale(1.06)}to{opacity:1;transform:none}}
   #judge{font-size:26px;letter-spacing:.01em;text-shadow:-2px -2px 0 #14234d,2px -2px 0 #14234d,-2px 2px 0 #14234d,2px 2px 0 #14234d,0 -2px 0 #14234d,0 2px 0 #14234d,-2px 0 0 #14234d,2px 0 0 #14234d,0 5px 0 #14234d,0 7px 10px rgba(0,0,0,.35)}
@@ -160,7 +171,7 @@ window.addEventListener('error', function(e){
     <div id="bootHero"></div>
     <div id="bootBar"><i></i></div>
     <div id="bootMsg">Loading…</div>
-    <div id="bootCopy">© BAEBAE Studio · v1118k</div>
+    <div id="bootCopy">© BAEBAE Studio · v1118l</div>
   </div>
   <div id="bootStudio">
     <div class="mark"><img id="studioLogo" src="assets/brand/studio_logo.png" alt="" style="max-width:56vw;max-height:30vh;display:none" onload="this.style.display='block';document.getElementById('studioMark').style.display='none'" onerror="this.remove()">
@@ -870,6 +881,7 @@ function leaguePoint(g){
     if (win) {
       S.rank += rp; const gold = clearRound(true);
       cheerUntil = performance.now() + 1800; SND.fanfare(); SND.cheer();
+      if (boss) confetti(50);
       showJudge(boss ? '승격전 승리!' : '라운드 클리어!', '#58d26b', `운영비 +${fmt(gold)} · 접속 보너스 +${Math.round((onBonus() - 1) * 100)}%`);
       checkLeagueStory();
     }
@@ -906,7 +918,29 @@ function checkLeagueStory(){
   const i = leagueIdx(chapterOf(S.stage));
   if (i <= S.seenLeague) return;
   S.seenLeague = i;
-  modal(`<h2>${leagueName(i)}</h2><p>${leagueStory(i)}</p>`, [{label:'계속'}]);
+  const nat = COUNTRIES[i % COUNTRIES.length], col = OPP_COL[i % OPP_COL.length];
+  try { SND.fanfare(); SND.cheer(); } catch (e) {}
+  confetti();
+  modal(`<div style="text-align:center"><div style="font-size:56px;line-height:1.1;animation:judgePop .5s cubic-bezier(.2,1.6,.4,1)">${FLAG[nat] || '🏐'}</div>
+    <h2 style="margin:4px 0">${leagueName(i)}</h2>
+    <div class="muted" style="display:inline-flex;align-items:center;gap:6px">이번 상대 유니폼 <span style="width:18px;height:18px;border-radius:5px;background:${col};border:2px solid #fff;box-shadow:0 0 0 2px ${col}"></span></div></div>
+    <p>${leagueStory(i)}</p>`, [{label:'원정 시작!'}]);
+}
+const FLAG = {'한국':'🇰🇷','중국':'🇨🇳','태국':'🇹🇭','일본':'🇯🇵','베트남':'🇻🇳','필리핀':'🇵🇭','카자흐스탄':'🇰🇿','이란':'🇮🇷','튀르키예':'🇹🇷','그리스':'🇬🇷',
+  '이탈리아':'🇮🇹','독일':'🇩🇪','프랑스':'🇫🇷','네덜란드':'🇳🇱','폴란드':'🇵🇱','세르비아':'🇷🇸','미국':'🇺🇸','쿠바':'🇨🇺','아르헨티나':'🇦🇷','브라질':'🇧🇷'};
+// 색종이: 화면 위에서 쏟아진다 (승격·새 리그)
+function confetti(n = 80){
+  const box = document.createElement('div'); box.className = 'confetti';
+  const C = ['#ffd84a', '#ff5a5a', '#4fb3ff', '#5fdc7a', '#c084ff', '#ff9a3d', '#ffffff'];
+  for (let k = 0; k < n; k++) {
+    const e = document.createElement('i');
+    e.style.left = Math.random() * 100 + '%'; e.style.background = C[k % C.length];
+    e.style.width = (6 + Math.random() * 6) + 'px'; e.style.height = (8 + Math.random() * 8) + 'px';
+    e.style.animationDelay = (Math.random() * .7) + 's'; e.style.animationDuration = (1.8 + Math.random() * 1.4) + 's';
+    e.style.setProperty('--dx', (Math.random() * 120 - 60) + 'px'); e.style.setProperty('--r', (360 + Math.random() * 720) + 'deg');
+    box.appendChild(e);
+  }
+  document.body.appendChild(box); setTimeout(() => box.remove(), 4000);
 }
 // n점 선취제에서 득점 확률 p일 때 라운드를 이길 확률
 function roundWinProb(p, n){
