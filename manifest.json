@@ -1,0 +1,13 @@
+{
+  "name": "얼떨결에 구단주",
+  "short_name": "얼떨결에 구단주",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#5fb8ff",
+  "theme_color": "#5fb8ff",
+  "icons": [
+    {"src": "assets/brand/icon192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "assets/brand/icon512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}
